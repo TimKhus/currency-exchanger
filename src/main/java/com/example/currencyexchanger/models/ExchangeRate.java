@@ -28,6 +28,6 @@ public class ExchangeRate {
     Long targetCurrencyId;
 
     @NotBlank
-    @Column(name = "rate")
+    @Column(name = "rate", precision = 12, scale = 7)
     BigDecimal rate;
 }
