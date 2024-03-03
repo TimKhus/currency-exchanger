@@ -45,4 +45,5 @@ public class ExchangeRateService {
     public void deleteExchangeRate(Long id) {
         exchangeRateRepository.deleteById(id);
     }
+
 }
