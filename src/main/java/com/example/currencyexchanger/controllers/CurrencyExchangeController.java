@@ -43,6 +43,13 @@ public class CurrencyExchangeController {
         return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
+    @DeleteMapping(path = "/currency/delete/{id}")
+    public ResponseEntity<String> deleteCurrency(@PathVariable Long id) {
+        String currencyName = currencyService.getCurrencyById(id).get().getFullName();
+        currencyService.deleteCurrencyById(id);
+        return new ResponseEntity<>("Currency " + currencyName + " deleted successfully", HttpStatus.OK);
+    }
+
     @PostMapping(path = "/currency")
     public ResponseEntity<Currency> saveCurrency(@RequestBody CurrencyDTO currencyDTO) {
         Currency currencyToSave = new Currency();
@@ -65,6 +72,12 @@ public class CurrencyExchangeController {
         return new ResponseEntity<>(exchangeRate, HttpStatus.OK);
     }
 
+    @DeleteMapping(path = "/exchange-rate/delete/{id}")
+    public ResponseEntity<String> deleteExchangeRate(@PathVariable Long id) {
+        exchangeRateService.deleteExchangeRate(id);
+        return new ResponseEntity<>("Exchange rate " + id + " deleted successfully", HttpStatus.OK);
+    }
+
     @PostMapping(path = "/exchange-rate")
     public ResponseEntity<ExchangeRate> saveExchangeRate(@RequestBody ExchangeRateDTO exchangeRateDTO) {
         ExchangeRate exchangeRateToSave = new ExchangeRate();
@@ -74,6 +87,8 @@ public class CurrencyExchangeController {
         exchangeRateService.saveExchangeRate(exchangeRateToSave);
         return new ResponseEntity<>(exchangeRateToSave, HttpStatus.OK);
     }
+
+    
 
 }
 
