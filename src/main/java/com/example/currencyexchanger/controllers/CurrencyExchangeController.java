@@ -11,7 +11,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 public class CurrencyExchangeController {
@@ -20,7 +22,7 @@ public class CurrencyExchangeController {
     private final ExchangeRateService exchangeRateService;
 
     @Autowired
-    CurrencyExchangeController(CurrencyService currencyService, ExchangeRateService exchangeRateService){
+    CurrencyExchangeController(CurrencyService currencyService, ExchangeRateService exchangeRateService) {
         this.currencyService = currencyService;
         this.exchangeRateService = exchangeRateService;
     }
@@ -31,7 +33,7 @@ public class CurrencyExchangeController {
         return new ResponseEntity<>(currencies, HttpStatus.OK);
     }
 
-    @GetMapping(path="/currency/id/{id}")
+    @GetMapping(path = "/currency/id/{id}")
     public ResponseEntity<Currency> getCurrencyById(@PathVariable Long id) {
         Currency currency = currencyService.getCurrencyById(id).get();
         return new ResponseEntity<>(currency, HttpStatus.OK);
@@ -88,7 +90,49 @@ public class CurrencyExchangeController {
         return new ResponseEntity<>(exchangeRateToSave, HttpStatus.OK);
     }
 
-    
+    @GetMapping(path = "/exchange")
+    public ResponseEntity<String> performExchange(
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam double amount
+    ) {
+        Currency fromCurrency = currencyService.getCurrencyByCode(from.toUpperCase()).orElseThrow();
+        Currency toCurrency = currencyService.getCurrencyByCode(to.toUpperCase()).orElseThrow();
+
+        Optional<ExchangeRate> directRate = exchangeRateService.getExchangeRateByCurrenciesIds(
+                fromCurrency.getId(), toCurrency.getId());
+
+        if (!directRate.isPresent()) {
+            Optional<ExchangeRate> reverseRate = exchangeRateService.getExchangeRateByCurrenciesIds(
+                    toCurrency.getId(), fromCurrency.getId());
+            if (reverseRate.isPresent()) {
+                double convertedAmount = amount / reverseRate.get().getRate().doubleValue();
+                return createResponse(amount, fromCurrency.getCode(), toCurrency.getCode(), reverseRate.get().getRate(), convertedAmount);
+            }
+        } else {
+            double convertedAmount = amount * directRate.get().getRate().doubleValue();
+            return createResponse(amount, fromCurrency.getCode(), toCurrency.getCode(), directRate.get().getRate(), convertedAmount);
+        }
+
+        Optional<ExchangeRate> usdFromRate = exchangeRateService.getExchangeRateByCurrenciesIds(1L, fromCurrency.getId());
+        Optional<ExchangeRate> usdToRate = exchangeRateService.getExchangeRateByCurrenciesIds(1L, toCurrency.getId());
+
+        if (usdFromRate.isPresent() && usdToRate.isPresent()) {
+            double usdToFromCurrency = usdFromRate.get().getRate().doubleValue();
+            double usdToToCurrency = usdToRate.get().getRate().doubleValue();
+            double convertedAmount = (1 / usdToFromCurrency) * usdToToCurrency * amount;
+            return createResponse(amount, fromCurrency.getCode(), toCurrency.getCode(), usdFromRate.get().getRate(), convertedAmount);
+        }
+
+        return new ResponseEntity<>("Exchange rate not available for the given currencies", HttpStatus.BAD_REQUEST);
+    }
+
+    private ResponseEntity<String> createResponse(double amount, String fromCurrencyCode, String toCurrencyCode,
+                                                  BigDecimal exchangeRate, double convertedAmount) {
+        String response =String.format("Exchanging %.2f %s to %s.<br>Rate: %f<br>Converted amount: %.2f %s",
+                amount, fromCurrencyCode, toCurrencyCode, exchangeRate, convertedAmount, toCurrencyCode);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
 
 }
 
