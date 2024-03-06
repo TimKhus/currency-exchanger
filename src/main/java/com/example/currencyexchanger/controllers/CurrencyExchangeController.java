@@ -6,6 +6,7 @@ import com.example.currencyexchanger.models.Currency;
 import com.example.currencyexchanger.models.ExchangeRate;
 import com.example.currencyexchanger.services.CurrencyService;
 import com.example.currencyexchanger.services.ExchangeRateService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,18 +31,30 @@ public class CurrencyExchangeController {
     @GetMapping(path = "/currencies")
     public ResponseEntity<List<Currency>> getAllCurrencies() {
         List<Currency> currencies = currencyService.getAllCurrencies();
-        return new ResponseEntity<>(currencies, HttpStatus.OK);
+        if (currencies.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(currencies, HttpStatus.OK);
+        }
     }
 
     @GetMapping(path = "/currency/id/{id}")
-    public ResponseEntity<Currency> getCurrencyById(@PathVariable Long id) {
-        Currency currency = currencyService.getCurrencyById(id).get();
-        return new ResponseEntity<>(currency, HttpStatus.OK);
+    public ResponseEntity<?> getCurrencyById(@PathVariable Long id) {
+        try {
+            Currency currency = currencyService.getCurrencyById(id)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            String.format("Currency with id %s not found", id)));
+
+            return new ResponseEntity<>(currency, HttpStatus.OK);
+        } catch (EntityNotFoundException ex) {
+            String errorMessage = ex.getMessage();
+            return new ResponseEntity<>(errorMessage, HttpStatus.NOT_FOUND);
+        }
     }
 
     @GetMapping(path = "/currency/code/{code}")
     public ResponseEntity<Currency> getCurrencyByCode(@PathVariable String code) {
-        Currency currency = currencyService.getCurrencyByCode(code.toUpperCase()).get();
+        Currency currency = currencyService.getCurrencyByCode(code.toUpperCase()).orElseThrow();
         return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
