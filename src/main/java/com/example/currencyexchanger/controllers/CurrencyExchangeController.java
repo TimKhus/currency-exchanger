@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @RestController
@@ -31,38 +32,35 @@ public class CurrencyExchangeController {
     @GetMapping(path = "/currencies")
     public ResponseEntity<List<Currency>> getAllCurrencies() {
         List<Currency> currencies = currencyService.getAllCurrencies();
-        if (currencies.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        } else {
-            return new ResponseEntity<>(currencies, HttpStatus.OK);
-        }
+        return new ResponseEntity<>(currencies, HttpStatus.OK);
     }
 
     @GetMapping(path = "/currency/id/{id}")
     public ResponseEntity<?> getCurrencyById(@PathVariable Long id) {
-        try {
-            Currency currency = currencyService.getCurrencyById(id)
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            String.format("Currency with id %s not found", id)));
-
-            return new ResponseEntity<>(currency, HttpStatus.OK);
-        } catch (EntityNotFoundException ex) {
-            String errorMessage = ex.getMessage();
-            return new ResponseEntity<>(errorMessage, HttpStatus.NOT_FOUND);
-        }
+        Currency currency = currencyService.getCurrencyById(id).orElseThrow(
+                () -> new EntityNotFoundException(
+                        String.format("No currency with id %s", id)));
+        return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
     @GetMapping(path = "/currency/code/{code}")
-    public ResponseEntity<Currency> getCurrencyByCode(@PathVariable String code) {
-        Currency currency = currencyService.getCurrencyByCode(code.toUpperCase()).orElseThrow();
+    public ResponseEntity<?> getCurrencyByCode(@PathVariable String code) {
+
+        Currency currency = currencyService.getCurrencyByCode(code.toUpperCase())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        String.format("Currency with code %s not found", code)));
         return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
     @DeleteMapping(path = "/currency/delete/{id}")
     public ResponseEntity<String> deleteCurrency(@PathVariable Long id) {
-        String currencyName = currencyService.getCurrencyById(id).get().getFullName();
+        Currency currency = currencyService.getCurrencyById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        String.format("Currency with id %s not found", id)));
+        String currencyName = currency.getFullName();
         currencyService.deleteCurrencyById(id);
         return new ResponseEntity<>("Currency " + currencyName + " deleted successfully", HttpStatus.OK);
+
     }
 
     @PostMapping(path = "/currency")
@@ -78,12 +76,18 @@ public class CurrencyExchangeController {
     @GetMapping(path = "/exchange-rates")
     public ResponseEntity<List<ExchangeRate>> getAllExchangeRates() {
         List<ExchangeRate> exchangeRates = exchangeRateService.getAllExchangeRates();
-        return new ResponseEntity<>(exchangeRates, HttpStatus.OK);
+        if (exchangeRates.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(exchangeRates, HttpStatus.OK);
+        }
     }
 
     @GetMapping(path = "exchange-rate/id/{id1}-{id2}")
     public ResponseEntity<ExchangeRate> getExchangeRateByIds(@PathVariable Long id1, @PathVariable Long id2) {
-        ExchangeRate exchangeRate = exchangeRateService.getExchangeRateByCurrenciesIds(id1, id2).orElseThrow();
+        ExchangeRate exchangeRate = exchangeRateService.getExchangeRateByCurrenciesIds(id1, id2).orElseThrow(
+                () -> new EntityNotFoundException(
+                        String.format("Exchange rate for currencies with id %s and id %s not found", id1, id2)));
         return new ResponseEntity<>(exchangeRate, HttpStatus.OK);
     }
 
@@ -142,7 +146,7 @@ public class CurrencyExchangeController {
 
     private ResponseEntity<String> createResponse(double amount, String fromCurrencyCode, String toCurrencyCode,
                                                   BigDecimal exchangeRate, double convertedAmount) {
-        String response =String.format("Exchanging %.2f %s to %s.<br>Rate: %f<br>Converted amount: %.2f %s",
+        String response = String.format("Exchanging %.2f %s to %s.<br>Rate: %f<br>Converted amount: %.2f %s",
                 amount, fromCurrencyCode, toCurrencyCode, exchangeRate, convertedAmount, toCurrencyCode);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
