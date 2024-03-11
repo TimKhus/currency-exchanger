@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 @RestController
@@ -35,36 +34,44 @@ public class CurrencyExchangeController {
         return new ResponseEntity<>(currencies, HttpStatus.OK);
     }
 
-    @GetMapping(path = "/currency/id/{id}")
-    public ResponseEntity<?> getCurrencyById(@PathVariable Long id) {
-        Currency currency = currencyService.getCurrencyById(id).orElseThrow(
+    @GetMapping(path = "/currency/id/{currencyId}")
+    public ResponseEntity<?> getCurrencyById(@PathVariable Long currencyId) {
+        Currency currency = currencyService.getCurrencyById(currencyId).orElseThrow(
                 () -> new EntityNotFoundException(
-                        String.format("No currency with id %s", id)));
+                        String.format("No currency with id %s", currencyId)));
         return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
-    @GetMapping(path = "/currency/code/{code}")
-    public ResponseEntity<?> getCurrencyByCode(@PathVariable String code) {
+    @GetMapping(path = "/currency/code/{currencyCode}")
+    public ResponseEntity<?> getCurrencyByCode(@PathVariable String currencyCode) {
 
-        Currency currency = currencyService.getCurrencyByCode(code.toUpperCase())
+        Currency currency = currencyService.getCurrencyByCode(currencyCode.toUpperCase())
                 .orElseThrow(() -> new EntityNotFoundException(
-                        String.format("Currency with code %s not found", code)));
+                        String.format("Currency with code %s not found", currencyCode)));
         return new ResponseEntity<>(currency, HttpStatus.OK);
     }
 
-    @DeleteMapping(path = "/currency/delete/{id}")
-    public ResponseEntity<String> deleteCurrency(@PathVariable Long id) {
-        Currency currency = currencyService.getCurrencyById(id)
+    @DeleteMapping(path = "/currency/delete/{currencyId}")
+    public ResponseEntity<String> deleteCurrency(@PathVariable Long currencyId) {
+        Currency currency = currencyService.getCurrencyById(currencyId)
                 .orElseThrow(() -> new EntityNotFoundException(
-                        String.format("Currency with id %s not found", id)));
+                        String.format("Currency with id %s not found", currencyId)));
         String currencyName = currency.getFullName();
-        currencyService.deleteCurrencyById(id);
+        currencyService.deleteCurrencyById(currencyId);
         return new ResponseEntity<>("Currency " + currencyName + " deleted successfully", HttpStatus.OK);
 
     }
 
     @PostMapping(path = "/currency")
-    public ResponseEntity<Currency> saveCurrency(@RequestBody CurrencyDTO currencyDTO) {
+    public ResponseEntity<?> saveCurrency(@RequestBody CurrencyDTO currencyDTO) {
+        if (currencyDTO == null) {
+            return new ResponseEntity<>("CurrencyDTO is null", HttpStatus.BAD_REQUEST);
+        }
+
+        if (currencyDTO.getCode() == null || currencyDTO.getFullName() == null) {
+            return new ResponseEntity<>("Code and fullName are required fields", HttpStatus.BAD_REQUEST);
+        }
+
         Currency currencyToSave = new Currency();
         currencyToSave.setCode(currencyDTO.getCode());
         currencyToSave.setFullName(currencyDTO.getFullName());
@@ -83,22 +90,31 @@ public class CurrencyExchangeController {
         }
     }
 
-    @GetMapping(path = "exchange-rate/id/{id1}-{id2}")
-    public ResponseEntity<ExchangeRate> getExchangeRateByIds(@PathVariable Long id1, @PathVariable Long id2) {
-        ExchangeRate exchangeRate = exchangeRateService.getExchangeRateByCurrenciesIds(id1, id2).orElseThrow(
+    @GetMapping(path = "exchange-rate/id/{sourceCurrencyId}-{targetCurrencyId}")
+    public ResponseEntity<ExchangeRate> getExchangeRateByIds(@PathVariable Long sourceCurrencyId, @PathVariable Long targetCurrencyId) {
+        ExchangeRate exchangeRate = exchangeRateService.getExchangeRateByCurrenciesIds(sourceCurrencyId, targetCurrencyId).orElseThrow(
                 () -> new EntityNotFoundException(
-                        String.format("Exchange rate for currencies with id %s and id %s not found", id1, id2)));
+                        String.format("Exchange rate for currencies with id %s and id %s not found", sourceCurrencyId, targetCurrencyId)));
         return new ResponseEntity<>(exchangeRate, HttpStatus.OK);
     }
 
-    @DeleteMapping(path = "/exchange-rate/delete/{id}")
-    public ResponseEntity<String> deleteExchangeRate(@PathVariable Long id) {
-        exchangeRateService.deleteExchangeRate(id);
-        return new ResponseEntity<>("Exchange rate " + id + " deleted successfully", HttpStatus.OK);
+    @DeleteMapping(path = "/exchange-rate/delete/{exchangeRateId}")
+    public ResponseEntity<String> deleteExchangeRate(@PathVariable Long exchangeRateId) {
+        exchangeRateService.deleteExchangeRate(exchangeRateId);
+        return new ResponseEntity<>("Exchange rate " + exchangeRateId + " deleted successfully", HttpStatus.OK);
     }
 
     @PostMapping(path = "/exchange-rate")
-    public ResponseEntity<ExchangeRate> saveExchangeRate(@RequestBody ExchangeRateDTO exchangeRateDTO) {
+    public ResponseEntity<?> saveExchangeRate(@RequestBody ExchangeRateDTO exchangeRateDTO) {
+        if (exchangeRateDTO == null) {
+            return new ResponseEntity<>("ExchangeRateDTO", HttpStatus.BAD_REQUEST);
+        }
+
+        if (exchangeRateDTO.getSourceCurrencyId() == null || exchangeRateDTO.getTargetCurrencyId() == null
+        || exchangeRateDTO.getRate() == null) {
+            return new ResponseEntity<>("Currency ids and exchange rate are required fields", HttpStatus.BAD_REQUEST);
+        }
+        
         ExchangeRate exchangeRateToSave = new ExchangeRate();
         exchangeRateToSave.setSourceCurrencyId(exchangeRateDTO.getSourceCurrencyId());
         exchangeRateToSave.setTargetCurrencyId(exchangeRateDTO.getTargetCurrencyId());
@@ -119,7 +135,7 @@ public class CurrencyExchangeController {
         Optional<ExchangeRate> directRate = exchangeRateService.getExchangeRateByCurrenciesIds(
                 fromCurrency.getId(), toCurrency.getId());
 
-        if (!directRate.isPresent()) {
+        if (directRate.isEmpty()) {
             Optional<ExchangeRate> reverseRate = exchangeRateService.getExchangeRateByCurrenciesIds(
                     toCurrency.getId(), fromCurrency.getId());
             if (reverseRate.isPresent()) {
